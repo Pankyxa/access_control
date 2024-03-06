@@ -1,10 +1,19 @@
 import base64
 from uuid import UUID
+from typing import Any
 
+from advanced_alchemy.extensions.litestar import SQLAlchemyInitPlugin
+
+from src.db import db_config
+
+import sqlalchemy.orm
 from cryptography.fernet import Fernet
-from litestar.security.jwt import JWTAuth
+from litestar.connection import ASGIConnection
+from litestar.security.jwt import JWTAuth, Token, JWTAuthenticationMiddleware
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.dependencies import provide_transaction
 from src.models.users import Users
 from src.settings import settings
 
@@ -21,9 +30,19 @@ def encrypt(password: str):
     return fernet.encrypt(password.encode("utf-8")).decode('utf-8')
 
 
-async def retrieve_user_handler(session: AsyncSession, user_id: UUID) -> Users | None:
-    user = await session.get(Users, user_id)
-    return user
+async def retrieve_user_handler(
+        token: Token,
+        _: "ASGIConnection[Any]",
+) -> Users | None:
+    async with db_config.get_session() as session:
+        result = await session.execute(
+            select(Users)
+            .where(
+                Users.email == token.sub
+            )
+        )
+        result = result.scalar_one()
+    return result
 
 
 jwt_auth = JWTAuth[Users](

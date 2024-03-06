@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from litestar import post, Response, get
+from litestar import post, Response, get, Request
 from litestar.exceptions import HTTPException, NotFoundException
 from litestar.security.jwt import Token
 from sqlalchemy import select
@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import encrypt, jwt_auth, decrypt
 from src.models.users import Users
 from src.schemas.auth import UserRegister, UserLogin
+
+
 
 
 @post('/register')
@@ -54,12 +56,3 @@ async def login_handler(data: UserLogin, transaction: AsyncSession) -> Response[
             raise HTTPException(status_code=401, detail="Incorrect email or password")
     except NoResultFound:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-
-
-@get("/some-path", sync_to_thread=False)
-def some_route_handler(request: "Request[Users, Token, Any]") -> Any:
-    # request.user is set to the instance of user returned by the middleware
-    assert isinstance(request.user, Users)
-    # request.auth is the instance of 'litestar_jwt.Token' created from the data encoded in the auth header
-    assert isinstance(request.auth, Token)
-    # do stuff ...
