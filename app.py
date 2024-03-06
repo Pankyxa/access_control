@@ -1,7 +1,7 @@
 from litestar import Litestar
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 
-from src.endpoints.auth import register_handler, login_handler, some_route_handler
+from src.endpoints.auth import register_handler, login_handler
 from src.endpoints.roles import assign_role_handler, remove_role_handler
 from src.auth import jwt_auth
 from src.db import db_config
