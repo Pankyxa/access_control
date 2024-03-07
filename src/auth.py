@@ -1,19 +1,12 @@
 import base64
-from uuid import UUID
 from typing import Any
 
-from advanced_alchemy.extensions.litestar import SQLAlchemyInitPlugin
-
-from src.db import db_config
-
-import sqlalchemy.orm
 from cryptography.fernet import Fernet
 from litestar.connection import ASGIConnection
-from litestar.security.jwt import JWTAuth, Token, JWTAuthenticationMiddleware
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from litestar.security.jwt import JWTAuth, Token
+from sqlalchemy import select
 
-from src.dependencies import provide_transaction
+from src.db import db_config
 from src.models.users import Users
 from src.settings import settings
 

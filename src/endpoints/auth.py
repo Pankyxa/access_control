@@ -1,9 +1,7 @@
 from datetime import datetime
-from typing import Any
 
-from litestar import post, Response, get, Request
+from litestar import post, Response
 from litestar.exceptions import HTTPException, NotFoundException
-from litestar.security.jwt import Token
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import encrypt, jwt_auth, decrypt
 from src.models.users import Users
 from src.schemas.auth import UserRegister, UserLogin
-
-
 
 
 @post('/register')
