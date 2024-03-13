@@ -1,37 +1,23 @@
 from __future__ import annotations
+
 from datetime import date
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from uuid import UUID, uuid4
 
-class Base(DeclarativeBase):
-    ...
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-class GuestsModel(Base):
-    __tablename__ = "Guests" 
-    id: Mapped[UUID] = mapped_column(default=uuid4, primary_key=True) 
-    fullname: Mapped[str]
+from src.models import Base
+
+
+class RequestsDto(Base):
+    __tablename__ = "requests"
+    id: Mapped[UUID] = mapped_column(default=uuid4, primary_key=True)
+    full_name: Mapped[str]
     email_address: Mapped[str]
-    responsible_person_id: Mapped[int] = mapped_column(ForeignKey("Persons.res_id"))
-    date_time: Mapped[date]
-    approver: Mapped[str] = mapped_column(ForeignKey("Security.sec_id"))
-    status: Mapped[bool]
-    invited:Mapped["ResponsiblePersModel"] = relationship(back_populates="request") 
-    approved:Mapped["SecurityModel"] = relationship(back_populates="request_approval")
+    appellant_id: Mapped[UUID] = mapped_column(ForeignKey('users.id'), default=uuid4)
+    datetime: Mapped[date]
+    status: Mapped[int]
+    confirming_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id'), default=None)
 
-
-class ResponsiblePersModel(Base):
-    __tablename__ = "Persons" 
-    res_id: Mapped[int] = mapped_column(primary_key=True) 
-    person_fullname: Mapped[str]
-    request:Mapped["GuestsModel"] = relationship(back_populates="invited") 
-
-class SecurityModel(Base):
-    __tablename__ = "Security"
-    sec_id: Mapped[int] = mapped_column(primary_key=True)
-    security_fullname: Mapped[str]
-    request_approval:Mapped["GuestsModel"] = relationship(back_populates="approved") 
-    
-
-
-    
+    appellant = relationship("Users", back_populates="requests_appellant", foreign_keys=[appellant_id])
+    confirming = relationship("Users", back_populates="requests_confirming", foreign_keys=[confirming_id])

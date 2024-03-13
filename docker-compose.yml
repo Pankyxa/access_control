@@ -10,6 +10,10 @@ services:
       - database
     ports:
       - "80:80"
+    volumes:
+      - .:/app
+    environment:
+      - LITESTAR_AUTO_RELOAD=true
 
   database:
     image: postgres:latest

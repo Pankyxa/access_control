@@ -1,25 +1,28 @@
 from __future__ import annotations
-from datetime import date
+
+from datetime import datetime
+from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel
 from pydantic import EmailStr
-  
-  
-class Guests(BaseModel):
-    id: UUID | None
-    fullname: str
-    email_address: EmailStr
-    responsible_person: str
-    date_time: date | None = None
-    approver: str
-    status: bool
 
 
-class GuestsCreate(BaseModel):
-    id: UUID | None
-    fullname: str
+class Requests(BaseModel):
+    id: UUID
+    full_name: str
     email_address: EmailStr
-    responsible_person: str
-    date_time: date | None = None
-    approver: str
-    status: bool
+    appellant_id: UUID
+    datetime: datetime
+    status: int
+    confirming_id: Optional[UUID]
+
+
+class RequestsCreate(BaseModel):
+    full_name: str
+    email_address: EmailStr
+
+
+class RequestsReview(BaseModel):
+    request_id: UUID
+    status: int

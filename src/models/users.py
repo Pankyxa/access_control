@@ -2,11 +2,10 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
-class Base(DeclarativeBase):
-    ...
+from src.models import Base
+from src.models.guests import RequestsDto
 
 
 class UserRoles(Base):
@@ -23,7 +22,7 @@ class Roles(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
 
-    users = relationship('Users', secondary='user_roles', back_populates='roles')
+    users = relationship('Users', secondary='user_roles', back_populates='roles', lazy='selectin')
 
 
 class Users(Base):
@@ -37,4 +36,8 @@ class Users(Base):
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
 
-    roles = relationship('Roles', secondary='user_roles', back_populates='users')
+    roles = relationship('Roles', secondary='user_roles', back_populates='users', lazy='selectin')
+    requests_appellant = relationship("RequestsDto", back_populates="appellant",
+                                      foreign_keys=[RequestsDto.appellant_id])
+    requests_confirming = relationship("RequestsDto", back_populates="confirming",
+                                       foreign_keys=[RequestsDto.confirming_id])

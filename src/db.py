@@ -1,7 +1,7 @@
 from advanced_alchemy.extensions.litestar.plugins.init.config.asyncio import autocommit_before_send_handler
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyAsyncConfig
 
-from src.models.users import Base
+from src.models import Base
 from src.settings import settings
 
 db_config = SQLAlchemyAsyncConfig(
