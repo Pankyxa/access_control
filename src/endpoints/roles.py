@@ -1,15 +1,14 @@
 from enum import Enum
+from typing import Any
 from uuid import UUID
 
+from litestar import post, Response, Request
 from litestar.exceptions import HTTPException
+from litestar.security.jwt import Token
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models.users import UserRoles, Users, Roles
-from typing import Any
 
-from litestar import post, Response, Request
-from litestar.security.jwt import Token
-
+from src.models.users import UserRoles, Users
 from src.schemas.roles import AssignRole
 
 
@@ -45,6 +44,8 @@ async def assign_role_handler(
         role_id=data.role_id,
     )
     transaction.add(user_item)
+    # if RolesEnum.confirming.value == data.role_id:
+    # channels_plugin.subscribe('sec', user_id=data.user_id)
     return Response(status_code=202, content={"message": "Role added successfully"})
 
 

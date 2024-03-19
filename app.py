@@ -1,14 +1,15 @@
 from litestar import Litestar
-from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.contrib.sqlalchemy.base import UUIDBase
+from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.di import Provide
 
-from src.endpoints.auth import register_handler, login_handler
-from src.endpoints.roles import assign_role_handler, remove_role_handler
-from src.endpoints.func import GuestsController
 from src.auth import jwt_auth
+from src.channels import channels_plugin
 from src.db import db_config
 from src.dependencies import provide_transaction, limitoffsetpagination
+from src.endpoints.auth import register_handler, login_handler
+from src.endpoints.func import GuestsController
+from src.endpoints.roles import assign_role_handler, remove_role_handler
 
 
 async def start() -> None:
@@ -22,5 +23,5 @@ app = Litestar(
     on_startup=[start],
     dependencies={"transaction": Provide(provide_transaction), 
                   "limit_offset": Provide(limitoffsetpagination, sync_to_thread=False)},
-    plugins=[SQLAlchemyPlugin(db_config)],
+    plugins=[SQLAlchemyPlugin(db_config), channels_plugin],
 )

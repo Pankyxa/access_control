@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.endpoints.roles import RolesEnum, get_roles
 from src.models.guests import RequestsDto
 from src.models.users import Users
 from src.schemas.pydantic_models import Requests, RequestsCreate, RequestsReview
@@ -91,6 +92,8 @@ class GuestsController(Controller):
             confirming_id=None,
         )
         transaction.add(statement)
+        # channels_plugin.subscribe(f'application_{statement.appellant_id}')
+        # channels_plugin.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
         return Response(status_code=202, content={"message": "Request sent to review"})
 
     @post(path="/requests/review")
@@ -100,6 +103,8 @@ class GuestsController(Controller):
             transaction: AsyncSession,
             data: RequestsReview
     ) -> Response:
+        if RolesEnum.confirming.value not in await get_roles(transaction, request.user.id):
+            raise HTTPException(status_code=403, detail="Forbidden")
         statement = select(RequestsDto).where(RequestsDto.id == data.request_id)
         result = await transaction.execute(statement)
         result = result.scalar_one_or_none()
@@ -107,4 +112,5 @@ class GuestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
+        # channels_plugin.publish({'message': 'Your request has been reviewed'}, f'application_{result.appellant_id}')
         return Response(status_code=202, content={"message": "Request reviewed successfully"})

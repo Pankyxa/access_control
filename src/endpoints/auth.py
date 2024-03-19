@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from litestar import post, Response
 from litestar.exceptions import HTTPException, NotFoundException
@@ -21,6 +22,7 @@ async def register_handler(data: UserRegister, transaction: AsyncSession) -> Res
         raise HTTPException(status_code=409, detail="Registration error. Please try again or contact support.")
 
     user_item = Users(
+        id=uuid4(),
         full_name=data.full_name,
         email=data.email,
         encrypted_password=encrypt(data.encrypted_password),
@@ -29,8 +31,7 @@ async def register_handler(data: UserRegister, transaction: AsyncSession) -> Res
     )
     transaction.add(user_item)
     query = select(Users).where(Users.email == data.email)
-    user_item = await transaction.execute(query)
-    return jwt_auth.login(identifier=str(data.email), response_body=user_item.scalar_one())
+    return jwt_auth.login(identifier=str(data.email), response_body=user_item)
 
 
 async def get_user_by_email(email: str, session: AsyncSession) -> Users:
