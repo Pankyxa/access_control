@@ -1,14 +1,16 @@
 from litestar import Litestar
+from litestar.channels import ChannelsPlugin
+from litestar.channels.backends.memory import MemoryChannelsBackend
 from litestar.contrib.sqlalchemy.base import UUIDBase
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.di import Provide
 
 from src.auth import jwt_auth
-from src.channels import channels_plugin
+from src.channels.notifications import applicant_handler, security_handler
 from src.db import db_config
 from src.dependencies import provide_transaction, limitoffsetpagination
 from src.endpoints.auth import register_handler, login_handler
-from src.endpoints.func import GuestsController
+from src.endpoints.requests import GuestsController
 from src.endpoints.roles import assign_role_handler, remove_role_handler
 
 
@@ -18,10 +20,12 @@ async def start() -> None:
 
 
 app = Litestar(
-    [register_handler, login_handler, assign_role_handler, remove_role_handler, GuestsController],
+    [register_handler, login_handler, assign_role_handler, remove_role_handler, GuestsController, security_handler,
+     applicant_handler],
     on_app_init=[jwt_auth.on_app_init],
     on_startup=[start],
-    dependencies={"transaction": Provide(provide_transaction), 
+    dependencies={"transaction": Provide(provide_transaction),
                   "limit_offset": Provide(limitoffsetpagination, sync_to_thread=False)},
-    plugins=[SQLAlchemyPlugin(db_config), channels_plugin],
+    plugins=[SQLAlchemyPlugin(db_config),
+             ChannelsPlugin(backend=MemoryChannelsBackend(), channels=['sec'], arbitrary_channels_allowed=True)],
 )

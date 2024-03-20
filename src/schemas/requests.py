@@ -21,6 +21,8 @@ class Requests(BaseModel):
 class RequestsCreate(BaseModel):
     full_name: str
     email_address: EmailStr
+    visit_purpose: str
+    datetime_of_visit: datetime
 
 
 class RequestsReview(BaseModel):

@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.guests import RequestsDto
 from src.models.users import Users
-from src.schemas.pydantic_models import Requests, RequestsCreate, RequestsReview
+from src.schemas.requests import Requests, RequestsCreate, RequestsReview
 
 
 class GuestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
@@ -86,6 +86,8 @@ class GuestsController(Controller):
             id=uuid4(),
             full_name=data.full_name,
             email_address=data.email_address,
+            visit_purpose=data.visit_purpose,
+            datetime_of_visit=data.datetime_of_visit,
             appellant_id=request.user.id,
             datetime=datetime.now(),
             status=StatusEnum.NEW.value,
