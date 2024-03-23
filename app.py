@@ -13,7 +13,6 @@ from src.dependencies import provide_transaction, limitoffsetpagination
 from src.endpoints.auth import register_handler, login_handler
 from src.endpoints.requests import GuestsController
 from src.endpoints.roles import assign_role_handler, remove_role_handler
-from src.settings import settings
 
 
 async def start() -> None:
@@ -21,7 +20,7 @@ async def start() -> None:
         await conn.run_sync(UUIDBase.metadata.create_all)
 
 
-cors_config = CORSConfig(allow_origins=[settings.front_ip_1])
+cors_config = CORSConfig(allow_origins=['*'])
 
 app = Litestar(
     [register_handler, login_handler, assign_role_handler, remove_role_handler, GuestsController],
