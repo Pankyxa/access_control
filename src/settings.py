@@ -9,6 +9,7 @@ class _Settings(BaseSettings):
     db_ip: str = 'localhost'
     db_port: str = '8000'
     db_name: str = 'postgres'
+    front_ip_1: str = '127.0.0.1'
     model_config = SettingsConfigDict(env_file='.env')
 
 

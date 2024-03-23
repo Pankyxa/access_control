@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from litestar import get, post, Request, Response
+from litestar.channels import ChannelsPlugin
 from litestar.contrib.sqlalchemy.repository import SQLAlchemyAsyncRepository
 from litestar.controller import Controller
 from litestar.di import Provide
@@ -81,6 +82,7 @@ class GuestsController(Controller):
             request: Request[Users, Token, Any],
             transaction: AsyncSession,
             data: RequestsCreate,
+            channels: ChannelsPlugin,
     ) -> Any:
         statement = RequestsDto(
             id=uuid4(),
@@ -94,16 +96,20 @@ class GuestsController(Controller):
             confirming_id=None,
         )
         transaction.add(statement)
-        # channels_plugin.subscribe(f'application_{statement.appellant_id}')
-        # channels_plugin.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
-        return Response(status_code=202, content={"message": "Request sent to review"})
+        # applicant_channel = f"applicant_{statement.appellant_id}"
+        # await channels.subscribe(applicant_channel)
+        #
+        # channels.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
+        return Response(status_code=202,
+                        content={"message": "Request sent to review", "appellant_id": statement.appellant_id})
 
     @post(path="/requests/review")
     async def request_review(
             self,
             request: Request[Users, Token, Any],
             transaction: AsyncSession,
-            data: RequestsReview
+            data: RequestsReview,
+            channels: ChannelsPlugin
     ) -> Response:
         if RolesEnum.confirming.value not in await get_roles(transaction, request.user.id):
             raise HTTPException(status_code=403, detail="Forbidden")
@@ -114,5 +120,6 @@ class GuestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
-        # channels_plugin.publish({'message': 'Your request has been reviewed'}, f'application_{result.appellant_id}')
-        return Response(status_code=202, content={"message": "Request reviewed successfully"})
+        channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
+        return Response(status_code=202,
+                        content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})
