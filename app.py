@@ -11,7 +11,7 @@ from src.auth import jwt_auth
 from src.db import db_config
 from src.dependencies import provide_transaction, limitoffsetpagination
 from src.endpoints.auth import register_handler, login_handler
-from src.endpoints.requests import GuestsController
+from src.endpoints.requests import RequestsController
 from src.endpoints.roles import assign_role_handler, remove_role_handler
 
 
@@ -23,7 +23,7 @@ async def start() -> None:
 cors_config = CORSConfig(allow_origins=['*'])
 
 app = Litestar(
-    [register_handler, login_handler, assign_role_handler, remove_role_handler, GuestsController],
+    [register_handler, login_handler, assign_role_handler, remove_role_handler, RequestsController],
     on_app_init=[jwt_auth.on_app_init],
     on_startup=[start],
     dependencies={"transaction": Provide(provide_transaction),
