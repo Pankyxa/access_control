@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,10 +9,8 @@ from litestar.controller import Controller
 from litestar.di import Provide
 from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
-from litestar.params import Parameter
 from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
-from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,17 +21,20 @@ from src.models.users import Users
 from src.schemas.requests import Requests, RequestsCreate, RequestsReview
 
 
-class GuestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
+class RequestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
     model_type = RequestsDto
 
 
-async def guestsrepo(db_session: AsyncSession) -> GuestsRepository:
-    return GuestsRepository(session=db_session)
+async def requestsrepo(db_session: AsyncSession) -> RequestsRepository:
+    return RequestsRepository(session=db_session)
 
 
-async def guestsdetailsrepo(db_session: AsyncSession) -> GuestsRepository:
-    return GuestsRepository(
-        statement=select(RequestsDto).options(selectinload(RequestsDto.invited)),
+async def requestsdetailsrepo(db_session: AsyncSession, requests_id: UUID) -> RequestsRepository:
+    # noinspection PyTypeChecker
+    return RequestsRepository(
+
+        statement=select(RequestsDto).filter(RequestsDto.id == requests_id)
+        .options(selectinload(RequestsDto.appellant)),
         session=db_session,
     )
 
@@ -45,36 +45,38 @@ class StatusEnum(Enum):
     REJECTED = 3
 
 
-class GuestsController(Controller):
-    dependencies = {"guests_repo": Provide(guestsrepo)}
-
-    @get(path="/")
-    async def page(self) -> str:
-        return " "
+class RequestsController(Controller):
+    dependencies = {"requests_repo": Provide(requestsrepo)}
 
     @get(path="/requests/get")
     async def list_requests(
             self,
-            guests_repo: GuestsRepository,
+            requests_repo: RequestsRepository,
             limit_offset: LimitOffset,
     ) -> OffsetPagination[Requests]:
-        results, total = await guests_repo.list_and_count(limit_offset)
-        type_adapter = TypeAdapter(list[RequestsDto])
+        results, total = await requests_repo.list_and_count(limit_offset)
+        print(results)
+        # res = []
+        # for i in results:
+        #     print(i)
+        #     res.append(Requests.from_orm(i))
         return OffsetPagination[Requests](
-            items=type_adapter.validate_python(results),
+            items=results,
             total=total,
             limit=limit_offset.limit,
             offset=limit_offset.offset,
         )
 
-    @get(path="/requests/{guests_id:uuid}", dependencies={"guests_repo": Provide(guestsdetailsrepo)})
-    async def get_guest(
+    @get(path="/requests/{requests_id:uuid}", dependencies={"requests_repo": Provide(requestsdetailsrepo)})
+    async def get_request(
             self,
-            guests_repo: GuestsRepository,
-            guests_id: UUID = Parameter(title="Guest ID", ),
-    ) -> Requests:
-        obj = await guests_repo.get(guests_id)
-        return Requests.model_validate(obj)
+            requests_repo: RequestsRepository,
+            requests_id: UUID,
+    ) -> RequestsDto:
+        obj = await requests_repo.get(requests_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail="Not found")
+        return obj
 
     @post(path="/requests/create")
     async def create_request(
@@ -89,9 +91,9 @@ class GuestsController(Controller):
             full_name=data.full_name,
             email_address=data.email_address,
             visit_purpose=data.visit_purpose,
+            place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
             appellant_id=request.user.id,
-            datetime=datetime.now(),
             status=StatusEnum.NEW.value,
             confirming_id=None,
         )
@@ -120,6 +122,6 @@ class GuestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
-        channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
+        # channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
         return Response(status_code=202,
                         content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})

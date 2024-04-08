@@ -22,6 +22,7 @@ class RequestsCreate(BaseModel):
     full_name: str
     email_address: EmailStr
     visit_purpose: str
+    place_of_visit: str
     datetime_of_visit: datetime
 
 
