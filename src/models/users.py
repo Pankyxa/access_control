@@ -42,7 +42,6 @@ class Roles(Base):
     users = relationship('Users', secondary='user_roles', back_populates='roles', lazy='selectin')
 
 
-
 class Users(Base):
     __tablename__ = "users"
 

@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.guests import RequestsDto
 from src.models.users import Users
-from src.schemas.requests import RequestsCreate, RequestsReview
+from src.schemas.requests import RequestsCreate, RequestsReview, Requests
 
 
 class StatusEnum(Enum):
@@ -29,7 +29,7 @@ async def list_requests(db_session: AsyncSession, limit: int = 10, offset: int =
     async with db_session as session:
         statement = select(RequestsDto).options(
             selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
-        ).offset(offset).limit(limit)
+        ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
         result = await session.execute(statement)
         return [it for it in result.scalars()]
 
@@ -53,12 +53,13 @@ class RequestsController(Controller):
             self,
             db_session: AsyncSession,
             limit_offset: LimitOffset,
-    ) -> OffsetPagination[RequestsDto]:
+    ) -> OffsetPagination[Requests]:
         total = await db_session.execute(select(func.count(RequestsDto.id)))
         total_count = total.scalar_one()
         requests = await list_requests(db_session, limit_offset.limit, limit_offset.offset)
-        return OffsetPagination[RequestsDto](
-            items=requests,
+        pydantic_requests = [Requests.from_orm(req) for req in requests]
+        return OffsetPagination[Requests](
+            items=pydantic_requests,
             total=total_count,
             limit=limit_offset.limit,
             offset=limit_offset.offset,
@@ -69,8 +70,9 @@ class RequestsController(Controller):
             self,
             db_session: AsyncSession,
             request_id: UUID,
-    ) -> RequestsDto:
-        return await get_request_by_id(db_session, request_id)
+    ) -> Requests:
+        request = await get_request_by_id(db_session, request_id)
+        return Requests.from_orm(request)
 
     @post(path="/requests/create")
     async def create_request(
@@ -85,7 +87,7 @@ class RequestsController(Controller):
             full_name=data.full_name,
             email_address=data.email_address,
             visit_purpose=data.visit_purpose,
-	    place_of_visit=data.place_of_visit,
+            place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
             appellant_id=request.user.id,
             status=StatusEnum.NEW.value,
@@ -98,7 +100,7 @@ class RequestsController(Controller):
         # channels.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
         return Response(status_code=202,
                         content={"message": "Request sent to review", "appellant_id": statement.appellant_id})
-	    
+
     @post(path="/requests/review")
     async def request_review(
             self,
@@ -116,6 +118,6 @@ class RequestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
-        #channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
+        # channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
         return Response(status_code=202,
                         content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})
