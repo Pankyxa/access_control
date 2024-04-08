@@ -1,42 +1,23 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, List
 from uuid import UUID, uuid4
 
 from litestar import get, post, Request, Response
 from litestar.channels import ChannelsPlugin
-from litestar.contrib.sqlalchemy.repository import SQLAlchemyAsyncRepository
 from litestar.controller import Controller
-from litestar.di import Provide
 from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
-from litestar.params import Parameter
 from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
-from pydantic import TypeAdapter
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.guests import RequestsDto
 from src.models.users import Users
-from src.schemas.requests import Requests, RequestsCreate, RequestsReview
-
-
-class GuestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
-    model_type = RequestsDto
-
-
-async def guestsrepo(db_session: AsyncSession) -> GuestsRepository:
-    return GuestsRepository(session=db_session)
-
-
-async def guestsdetailsrepo(db_session: AsyncSession) -> GuestsRepository:
-    return GuestsRepository(
-        statement=select(RequestsDto).options(selectinload(RequestsDto.invited)),
-        session=db_session,
-    )
+from src.schemas.requests import RequestsCreate, RequestsReview
 
 
 class StatusEnum(Enum):
@@ -44,36 +25,53 @@ class StatusEnum(Enum):
     REJECTED = 3
 
 
-class GuestsController(Controller):
-    dependencies = {"guests_repo": Provide(guestsrepo)}
+async def list_requests(db_session: AsyncSession, limit: int = 10, offset: int = 0) -> List[RequestsDto]:
+    async with db_session as session:
+        statement = select(RequestsDto).options(
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+        ).offset(offset).limit(limit)
+        result = await session.execute(statement)
+        return [it for it in result.scalars()]
 
-    @get(path="/")
-    async def page(self) -> str:
-        return " "
+
+async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> RequestsDto:
+    async with db_session as session:
+        statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+        )
+        result = await session.execute(statement)
+        obj = result.scalar_one_or_none()
+        if not obj:
+            raise HTTPException(status_code=404, detail="Not found")
+        return obj
+
+
+class RequestsController(Controller):
+    dependencies = {}
 
     @get(path="/requests/get")
-    async def list_requests(
+    async def get_list_requests(
             self,
-            guests_repo: GuestsRepository,
+            db_session: AsyncSession,
             limit_offset: LimitOffset,
-    ) -> OffsetPagination[Requests]:
-        results, total = await guests_repo.list_and_count(limit_offset)
-        type_adapter = TypeAdapter(list[RequestsDto])
-        return OffsetPagination[Requests](
-            items=type_adapter.validate_python(results),
-            total=total,
+    ) -> OffsetPagination[RequestsDto]:
+        total = await db_session.execute(select(func.count(RequestsDto.id)))
+        total_count = total.scalar_one()
+        requests = await list_requests(db_session, limit_offset.limit, limit_offset.offset)
+        return OffsetPagination[RequestsDto](
+            items=requests,
+            total=total_count,
             limit=limit_offset.limit,
             offset=limit_offset.offset,
         )
 
-    @get(path="/requests/{guests_id:uuid}", dependencies={"guests_repo": Provide(guestsdetailsrepo)})
-    async def get_guest(
+    @get(path="/requests/{request_id:uuid}")
+    async def get_request_id(
             self,
-            guests_repo: GuestsRepository,
-            guests_id: UUID = Parameter(title="Guest ID", ),
-    ) -> Requests:
-        obj = await guests_repo.get(guests_id)
-        return Requests.model_validate(obj)
+            db_session: AsyncSession,
+            request_id: UUID,
+    ) -> RequestsDto:
+        return await get_request_by_id(db_session, request_id)
 
     @post(path="/requests/create")
     async def create_request(
