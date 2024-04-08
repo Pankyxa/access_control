@@ -47,7 +47,6 @@ async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> Reque
 
 
 class RequestsController(Controller):
-    dependencies = {}
 
     @get(path="/requests/get")
     async def get_list_requests(
