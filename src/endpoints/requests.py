@@ -27,38 +27,7 @@ class StatusEnum(Enum):
     REJECTED = 3
 
 
-class RequestsController(Controller):
-    dependencies = {"requests_repo": Provide(requestsrepo)}
 
-    @get(path="/requests/get")
-    async def list_requests(
-            self,
-            requests_repo: RequestsRepository,
-            limit_offset: LimitOffset,
-    ) -> OffsetPagination[Requests]:
-        results, total = await requests_repo.list_and_count(limit_offset)
-        print(results)
-        # res = []
-        # for i in results:
-        #     print(i)
-        #     res.append(Requests.from_orm(i))
-        return OffsetPagination[Requests](
-            items=results,
-            total=total,
-            limit=limit_offset.limit,
-            offset=limit_offset.offset,
-        )
-
-    @get(path="/requests/{requests_id:uuid}", dependencies={"requests_repo": Provide(requestsdetailsrepo)})
-    async def get_request(
-            self,
-            requests_repo: RequestsRepository,
-            requests_id: UUID,
-    ) -> RequestsDto:
-        obj = await requests_repo.get(requests_id)
-        if not obj:
-            raise HTTPException(status_code=404, detail="Not found")
-        return obj
 
     @post(path="/requests/create")
     async def create_request(
