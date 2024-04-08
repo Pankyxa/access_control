@@ -21,24 +21,6 @@ from src.models.users import Users
 from src.schemas.requests import Requests, RequestsCreate, RequestsReview
 
 
-class RequestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
-    model_type = RequestsDto
-
-
-async def requestsrepo(db_session: AsyncSession) -> RequestsRepository:
-    return RequestsRepository(session=db_session)
-
-
-async def requestsdetailsrepo(db_session: AsyncSession, requests_id: UUID) -> RequestsRepository:
-    # noinspection PyTypeChecker
-    return RequestsRepository(
-
-        statement=select(RequestsDto).filter(RequestsDto.id == requests_id)
-        .options(selectinload(RequestsDto.appellant)),
-        session=db_session,
-    )
-
-
 class StatusEnum(Enum):
     NEW = 1
     ACCEPTED = 2
