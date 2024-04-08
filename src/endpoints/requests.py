@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import Enum
 from typing import Any, List
 from uuid import UUID, uuid4
@@ -21,7 +20,8 @@ from src.schemas.requests import RequestsCreate, RequestsReview
 
 
 class StatusEnum(Enum):
-	@@ -45,36 +26,53 @@ class StatusEnum(Enum):
+    NEW = 1
+    ACCEPTED = 2
     REJECTED = 3
 
 
@@ -86,9 +86,9 @@ class RequestsController(Controller):
             full_name=data.full_name,
             email_address=data.email_address,
             visit_purpose=data.visit_purpose,
+	    place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
             appellant_id=request.user.id,
-            datetime=datetime.now(),
             status=StatusEnum.NEW.value,
             confirming_id=None,
         )
@@ -99,6 +99,7 @@ class RequestsController(Controller):
         # channels.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
         return Response(status_code=202,
                         content={"message": "Request sent to review", "appellant_id": statement.appellant_id})
+	    
     @post(path="/requests/review")
     async def request_review(
             self,
@@ -116,6 +117,6 @@ class RequestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
-        channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
+        #channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
         return Response(status_code=202,
                         content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})
