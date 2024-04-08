@@ -1,42 +1,22 @@
 from enum import Enum
-from typing import Any
+from typing import Any, List
 from uuid import UUID, uuid4
 
 from litestar import get, post, Request, Response
 from litestar.channels import ChannelsPlugin
-from litestar.contrib.sqlalchemy.repository import SQLAlchemyAsyncRepository
 from litestar.controller import Controller
-from litestar.di import Provide
 from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
 from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.guests import RequestsDto
 from src.models.users import Users
-from src.schemas.requests import Requests, RequestsCreate, RequestsReview
-
-
-class RequestsRepository(SQLAlchemyAsyncRepository[RequestsDto]):
-    model_type = RequestsDto
-
-
-async def requestsrepo(db_session: AsyncSession) -> RequestsRepository:
-    return RequestsRepository(session=db_session)
-
-
-async def requestsdetailsrepo(db_session: AsyncSession, requests_id: UUID) -> RequestsRepository:
-    # noinspection PyTypeChecker
-    return RequestsRepository(
-
-        statement=select(RequestsDto).filter(RequestsDto.id == requests_id)
-        .options(selectinload(RequestsDto.appellant)),
-        session=db_session,
-    )
+from src.schemas.requests import RequestsCreate, RequestsReview
 
 
 class StatusEnum(Enum):
@@ -45,38 +25,52 @@ class StatusEnum(Enum):
     REJECTED = 3
 
 
+async def list_requests(db_session: AsyncSession, limit: int = 10, offset: int = 0) -> List[RequestsDto]:
+    async with db_session as session:
+        statement = select(RequestsDto).options(
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+        ).offset(offset).limit(limit)
+        result = await session.execute(statement)
+        return [it for it in result.scalars()]
+
+
+async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> RequestsDto:
+    async with db_session as session:
+        statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+        )
+        result = await session.execute(statement)
+        obj = result.scalar_one_or_none()
+        if not obj:
+            raise HTTPException(status_code=404, detail="Not found")
+        return obj
+
+
 class RequestsController(Controller):
-    dependencies = {"requests_repo": Provide(requestsrepo)}
 
     @get(path="/requests/get")
-    async def list_requests(
+    async def get_list_requests(
             self,
-            requests_repo: RequestsRepository,
+            db_session: AsyncSession,
             limit_offset: LimitOffset,
-    ) -> OffsetPagination[Requests]:
-        results, total = await requests_repo.list_and_count(limit_offset)
-        print(results)
-        # res = []
-        # for i in results:
-        #     print(i)
-        #     res.append(Requests.from_orm(i))
-        return OffsetPagination[Requests](
-            items=results,
-            total=total,
+    ) -> OffsetPagination[RequestsDto]:
+        total = await db_session.execute(select(func.count(RequestsDto.id)))
+        total_count = total.scalar_one()
+        requests = await list_requests(db_session, limit_offset.limit, limit_offset.offset)
+        return OffsetPagination[RequestsDto](
+            items=requests,
+            total=total_count,
             limit=limit_offset.limit,
             offset=limit_offset.offset,
         )
 
-    @get(path="/requests/{requests_id:uuid}", dependencies={"requests_repo": Provide(requestsdetailsrepo)})
-    async def get_request(
+    @get(path="/requests/{request_id:uuid}")
+    async def get_request_id(
             self,
-            requests_repo: RequestsRepository,
-            requests_id: UUID,
+            db_session: AsyncSession,
+            request_id: UUID,
     ) -> RequestsDto:
-        obj = await requests_repo.get(requests_id)
-        if not obj:
-            raise HTTPException(status_code=404, detail="Not found")
-        return obj
+        return await get_request_by_id(db_session, request_id)
 
     @post(path="/requests/create")
     async def create_request(
@@ -91,7 +85,7 @@ class RequestsController(Controller):
             full_name=data.full_name,
             email_address=data.email_address,
             visit_purpose=data.visit_purpose,
-            place_of_visit=data.place_of_visit,
+	    place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
             appellant_id=request.user.id,
             status=StatusEnum.NEW.value,
@@ -104,7 +98,7 @@ class RequestsController(Controller):
         # channels.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
         return Response(status_code=202,
                         content={"message": "Request sent to review", "appellant_id": statement.appellant_id})
-
+	    
     @post(path="/requests/review")
     async def request_review(
             self,
@@ -122,6 +116,6 @@ class RequestsController(Controller):
             raise HTTPException(status_code=404, detail="Request not found")
         result.status = data.status
         result.confirming_id = request.user.id
-        # channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
+        #channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
         return Response(status_code=202,
                         content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})

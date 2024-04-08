@@ -25,7 +25,7 @@ cors_config = CORSConfig(allow_origins=['*'])
 
 app = Litestar(
     [register_handler, login_handler, assign_role_handler, remove_role_handler, RequestsController,
-     create_user_handler],
+    create_user_handler],
     on_app_init=[jwt_auth.on_app_init],
     on_startup=[start],
     dependencies={"transaction": Provide(provide_transaction),
