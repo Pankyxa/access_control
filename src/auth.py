@@ -41,5 +41,5 @@ async def retrieve_user_handler(
 jwt_auth = JWTAuth[Users](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=settings.jwt_secret,
-    exclude=["/register", "/login", "/schema"],
+    exclude=["/register/*", "/login", "/schema"],
 )

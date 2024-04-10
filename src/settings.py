@@ -6,10 +6,11 @@ class _Settings(BaseSettings):
     jwt_secret: str
     db_username: str = 'user'
     db_password: str = 'password'
-    db_ip: str = 'localhost'
-    db_port: str = '8000'
+    db_ip: str = 'database'
+    db_port: str = '5432'
     db_name: str = 'postgres'
-    front_ip_1: str = '127.0.0.1'
+    admin_email: str = 'example@mail.com'
+    admin_email_password: str
     model_config = SettingsConfigDict(env_file='.env')
 
 
