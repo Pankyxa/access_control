@@ -48,7 +48,7 @@ async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> Reque
 
 class RequestsController(Controller):
 
-    @get(path="/requests/get")
+    @get(path="/requests")
     async def get_list_requests(
             self,
             db_session: AsyncSession,

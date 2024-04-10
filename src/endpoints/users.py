@@ -1,5 +1,4 @@
-from enum import Enum
-from typing import Any, List
+from typing import Any, List, Optional
 from uuid import uuid4, UUID
 
 from advanced_alchemy.filters import LimitOffset
@@ -69,53 +68,46 @@ async def create_user_handler(
     await send_message(str(user.email), message)
 
     return Response(status_code=202,
-                    content={"message": "A link has been sent to the user to complete the registration"})
+                    content={"message": "A link has been sent to the user to complete the registration",
+                             'token': token})
 
 
-class FilterUsers(Enum):
-    ALL = 0
-    EMPLOYEE = 1
-    SECURITY = 2
-    CONFIRMING = 3
-    ADMIN = 4
+async def list_users(
+        session: AsyncSession,
+        role: Optional[RolesEnum] = None,
+        limit: int = 10,
+        offset: int = 0
+) -> List[Users]:
+    query = select(Users).options(selectinload(Users.roles)).order_by(Users.created_at.desc())
 
+    if role:
+        query = query.join(UserRoles, Users.id == UserRoles.user_id).where(
+            UserRoles.role_id == role.value
+        ).distinct()
 
-async def list_users(db_session: AsyncSession, filter_for_users: FilterUsers, limit: int = 10, offset: int = 0) -> List[
-    Users]:
-    print(filter_for_users)
-    if filter_for_users == FilterUsers.ALL:
-        async with db_session as session:
-            statement = select(Users).options(selectinload(Users.roles)).order_by(Users.created_at.desc()).offset(
-                offset).limit(limit)
-        result = await session.execute(statement)
-        return [it for it in result.scalars()]
-    async with db_session as session:
-        statement = select(Users).join(UserRoles, Users.id == UserRoles.user_id).where(
-            UserRoles.role_id == filter_for_users.value).distinct().options(selectinload(Users.roles)).order_by(
-            Users.created_at.desc()).offset(offset).limit(limit)
-    result = await session.execute(statement)
+    query = query.offset(offset).limit(limit)
+    result = await session.execute(query)
     return [it for it in result.scalars()]
 
 
-async def get_user_by_id(db_session: AsyncSession, user_id: UUID) -> Users:
-    async with db_session as session:
-        statement = select(Users).filter(Users.id == user_id).options(
-            selectinload(Users.roles)
-        )
-        result = await session.execute(statement)
-        obj = result.scalar_one_or_none()
-        if not obj:
-            raise HTTPException(status_code=404, detail="Not found")
-        return obj
+async def get_user_by_id(session: AsyncSession, user_id: UUID) -> Users:
+    statement = select(Users).filter(Users.id == user_id).options(
+        selectinload(Users.roles)
+    )
+    result = await session.execute(statement)
+    obj = result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Not found")
+    return obj
 
 
-@get(path='/users/get/')
+@get(path='/users')
 async def get_list_users(
-        db_session: AsyncSession,
+        transaction: AsyncSession,
         limit_offset: LimitOffset,
-        filter_for_users: FilterUsers
+        role: Optional[RolesEnum]
 ) -> OffsetPagination[UserSerialize]:
-    users = await list_users(db_session, filter_for_users, limit_offset.limit, limit_offset.offset)
+    users = await list_users(transaction, role, limit_offset.limit, limit_offset.offset)
     pydantic_users = [UserSerialize.from_orm(usr) for usr in users]
     total = len(pydantic_users)
     return OffsetPagination[UserSerialize](
@@ -128,8 +120,8 @@ async def get_list_users(
 
 @get(path="/users/{user_id:uuid}")
 async def get_user_id(
-        db_session: AsyncSession,
+        transaction: AsyncSession,
         user_id: UUID,
 ) -> UserSerialize:
-    request = await get_user_by_id(db_session, user_id)
+    request = await get_user_by_id(transaction, user_id)
     return UserSerialize.from_orm(request)
