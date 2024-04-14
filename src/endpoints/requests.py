@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, List
+from typing import Any, List, Optional
 from uuid import UUID, uuid4
 
 from litestar import get, post, Request, Response
@@ -25,12 +25,30 @@ class StatusEnum(Enum):
     REJECTED = 3
 
 
-async def list_requests(db_session: AsyncSession, limit: int = 10, offset: int = 0) -> List[RequestsDto]:
-    async with db_session as session:
-        statement = select(RequestsDto).options(
+async def list_requests(
+        db_session: AsyncSession,
+        limit: int = 10,
+        offset: int = 0,
+        status: Optional[StatusEnum] = None,
+        fullname: Optional[str] = None,
+        appellant: Optional[str] = None
+) -> List[RequestsDto]:
+    async with (db_session as session):
+        query = select(RequestsDto).options(
             selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
         ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
-        result = await session.execute(statement)
+
+        if status:
+            query = query.where(RequestsDto.status == status.value).distinct()
+
+        if fullname:
+            query = query.where(RequestsDto.full_name.like(f'%{fullname}%')).distinct()
+
+        if appellant:
+            query = select(RequestsDto).join(Users, RequestsDto.appellant).where(Users.full_name
+                                                                                 .like(f'%{appellant}%'))
+
+        result = await session.execute(query)
         return [it for it in result.scalars()]
 
 
@@ -52,11 +70,35 @@ class RequestsController(Controller):
     async def get_list_requests(
             self,
             db_session: AsyncSession,
+            request: 'Request[Users, Token, Any]',
             limit_offset: LimitOffset,
+            status: Optional[StatusEnum] = None,
+            fullname: Optional[str] = None,
+            appellant: Optional[str] = None
     ) -> OffsetPagination[Requests]:
-        total = await db_session.execute(select(func.count(RequestsDto.id)))
+        total_query = select(func.count(RequestsDto.id))
+        total = await db_session.execute(total_query)
         total_count = total.scalar_one()
-        requests = await list_requests(db_session, limit_offset.limit, limit_offset.offset)
+
+        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(db_session, request.user.id):
+            requests = await list_requests(
+                db_session,
+                limit_offset.limit,
+                limit_offset.offset,
+                status=status,
+                fullname=fullname,
+                appellant=request.user.full_name
+            )
+        else:
+            requests = await list_requests(
+                db_session,
+                limit_offset.limit,
+                limit_offset.offset,
+                status=status,
+                fullname=fullname,
+                appellant=appellant
+            )
+
         pydantic_requests = [Requests.from_orm(req) for req in requests]
         return OffsetPagination[Requests](
             items=pydantic_requests,
