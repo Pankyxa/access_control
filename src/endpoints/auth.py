@@ -48,10 +48,6 @@ async def register_handler(data: UserRegister, transaction: AsyncSession, token:
 
 
 async def get_user_by_email(email: str, session: AsyncSession) -> Users:
-    query = select(Users)
-    result = await session.execute(query)
-    for res in result.scalars():
-        print(res.email)
     query = select(Users).where(Users.email == email)
     result = await session.execute(query)
     try:

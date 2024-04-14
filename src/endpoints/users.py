@@ -62,10 +62,16 @@ async def create_user_handler(
 
     url = str(request.url.scheme) + '://' + str(request.url.netloc) + '/register/' + str(token)
 
-    message = (f'You have been registered in the Third Party TIU Eligibility System, '
-               f'please follow the link to complete your registration: {url}')
+    message = f'Вы были зарегестрированы в системе "Допуск на ТИУ третьих лиц". Перейдите по ссылке чтобы завершить регистрацию: {url}'
+    html_message = f'''
+            <html>
+                <body>
+                    <p>{message}</p>
+                </body>
+            </html>
+            '''
 
-    await send_message(str(user.email), message)
+    await send_message(str(user.email), html_message)
 
     return Response(status_code=202,
                     content={"message": "A link has been sent to the user to complete the registration",

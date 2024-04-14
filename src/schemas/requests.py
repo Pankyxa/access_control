@@ -56,3 +56,7 @@ class RequestsCreate(BaseModel):
 class RequestsReview(BaseModel):
     request_id: UUID
     status: int
+
+
+class RequestsDelete(BaseModel):
+    request_id: UUID
