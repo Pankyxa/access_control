@@ -11,7 +11,7 @@ from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
 from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -44,18 +44,18 @@ async def list_requests(
 ) -> List[RequestsDto]:
     async with (db_session as session):
         query = select(RequestsDto).options(
-            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming), selectinload(RequestsDto.guest)
         ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
 
         if status:
             query = query.where(RequestsDto.status == status.value).distinct()
 
         if fullname:
-            query = query.where(RequestsDto.full_name.like(f'%{fullname}%')).distinct()
+            query = query.join(Guests, RequestsDto.guest).where(Guests.full_name.like(f'%{fullname}%')).distinct()
 
         if appellant:
-            query = select(RequestsDto).join(Users, RequestsDto.appellant).where(Users.full_name
-                                                                                 .like(f'%{appellant}%'))
+            query = query.join(Users, RequestsDto.appellant).where(Users.full_name
+                                                                   .like(f'%{appellant}%')).distinct()
 
         result = await session.execute(query)
         return [it for it in result.scalars()]
@@ -64,7 +64,8 @@ async def list_requests(
 async def get_request_by_id(session: AsyncSession, request_id: UUID) -> RequestsDto:
     async with session as session:
         statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
-            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming),
+            selectinload(RequestsDto.guest)
         )
         result = await session.execute(statement)
         obj = result.scalar_one_or_none()
@@ -92,20 +93,16 @@ class RequestsController(Controller):
     @get(path="/requests")
     async def get_list_requests(
             self,
-            session: AsyncSession,
+            transaction: AsyncSession,
             request: 'Request[Users, Token, Any]',
             limit_offset: LimitOffset,
             status: Optional[StatusEnum] = None,
             fullname: Optional[str] = None,
             appellant: Optional[str] = None
     ) -> OffsetPagination[Requests]:
-        total_query = select(func.count(RequestsDto.id))
-        total = await session.execute(total_query)
-        total_count = total.scalar_one()
-
-        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(session, request.user.id):
+        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(transaction, request.user.id):
             requests = await list_requests(
-                session,
+                transaction,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -114,7 +111,7 @@ class RequestsController(Controller):
             )
         else:
             requests = await list_requests(
-                session,
+                transaction,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -123,9 +120,10 @@ class RequestsController(Controller):
             )
 
         pydantic_requests = [Requests.from_orm(req) for req in requests]
+        total = len(pydantic_requests)
         return OffsetPagination[Requests](
             items=pydantic_requests,
-            total=total_count,
+            total=total,
             limit=limit_offset.limit,
             offset=limit_offset.offset,
         )
@@ -133,10 +131,10 @@ class RequestsController(Controller):
     @get(path="/requests/{request_id:uuid}")
     async def get_request_id(
             self,
-            session: AsyncSession,
+            transaction: AsyncSession,
             request_id: UUID,
     ) -> Requests:
-        request = await get_request_by_id(session, request_id)
+        request = await get_request_by_id(transaction, request_id)
         return Requests.from_orm(request)
 
     @post(path="/requests/create")

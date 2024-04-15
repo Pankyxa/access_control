@@ -11,8 +11,7 @@ from pydantic_extra_types.phone_numbers import PhoneNumber
 
 class Requests(BaseModel):
     id: UUID
-    full_name: str
-    email_address: EmailStr
+    guest: list[GuestSerialize]
     appellant_id: UUID
     appellant: UserSerialize
     datetime: datetime
@@ -40,6 +39,19 @@ class UserSerialize(BaseModel):
     created_at: datetime
     updated_at: datetime
     roles: List[RoleSerialize]
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class GuestSerialize(BaseModel):
+    id: UUID
+    full_name: str
+    email: EmailStr
+    phone_number: PhoneNumber
+    is_foreign: bool
+    visit_status: int
 
     class Config:
         orm_mode = True
