@@ -39,12 +39,14 @@ pydantic==2.6.1
 pydantic-settings==2.2.1
 pydantic_core==2.16.2
 Pygments==2.17.2
+pypng==0.20220715.0
 python-dateutil==2.8.2
 python-decouple==3.8
 python-dotenv==1.0.1
 python-jose==3.3.0
 pytz==2024.1
 PyYAML==6.0.1
+qrcode==7.4.2
 rich==13.7.0
 rich-click==1.7.3
 rsa==4.9

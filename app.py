@@ -5,6 +5,7 @@ from litestar.config.cors import CORSConfig
 from litestar.contrib.sqlalchemy.base import UUIDBase
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.di import Provide
+from litestar.static_files import create_static_files_router
 
 from src.auth import jwt_auth
 # from src.channels.notifications import notifications_handler
@@ -25,7 +26,8 @@ cors_config = CORSConfig(allow_origins=['*'])
 
 app = Litestar(
     [register_handler, login_handler, assign_role_handler, remove_role_handler, RequestsController,
-     create_user_handler, get_list_users, get_user_id],
+     create_user_handler, get_list_users, get_user_id,
+     create_static_files_router(path='/static', directories=['qr'], send_as_attachment=True)],
     on_app_init=[jwt_auth.on_app_init],
     on_startup=[start],
     dependencies={"transaction": Provide(provide_transaction),

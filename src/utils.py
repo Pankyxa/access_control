@@ -24,18 +24,28 @@ async def unique_token_generator(transaction):
             return generated_token
 
 
+# async def send_message(email: str, message: str):
+#     smtp_obj = smtplib.SMTP('smtp.yandex.ru', 587)
+#     smtp_obj.starttls()
+#     smtp_obj.login(settings.admin_email, settings.admin_email_password)
+#
+#     msg = MIMEMultipart()
+#     msg["From"] = settings.admin_email
+#     msg["To"] = email
+#     msg["Subject"] = ""
+#     msg.attach(MIMEText(message, "plain"))
+#
+#     smtp_obj.send_message(msg)
+
 async def send_message(email: str, message: str):
     smtp_obj = smtplib.SMTP('smtp.yandex.ru', 587)
     smtp_obj.starttls()
     smtp_obj.login(settings.admin_email, settings.admin_email_password)
 
     msg = MIMEMultipart()
-    text = message
-
-    msg = MIMEMultipart()
     msg["From"] = settings.admin_email
     msg["To"] = email
     msg["Subject"] = ""
-    msg.attach(MIMEText(text, "plain"))
+    msg.attach(MIMEText(message, "html"))
 
     smtp_obj.send_message(msg)
