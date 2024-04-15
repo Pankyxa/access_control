@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.endpoints.roles import RolesEnum, get_roles
-from src.models.guests import RequestsDto
+from src.models.requests import RequestsDto, Guests
 from src.models.users import Users
 from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete
 from src.utils import send_message
@@ -26,6 +26,12 @@ class StatusEnum(Enum):
     NEW = 1
     ACCEPTED = 2
     REJECTED = 3
+
+
+class VisitStatusEnum(Enum):
+    PENDING = 1
+    ENTERED = 2
+    EXITED = 3
 
 
 async def list_requests(
@@ -55,8 +61,8 @@ async def list_requests(
         return [it for it in result.scalars()]
 
 
-async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> RequestsDto:
-    async with db_session as session:
+async def get_request_by_id(session: AsyncSession, request_id: UUID) -> RequestsDto:
+    async with session as session:
         statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
             selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
         )
@@ -67,12 +73,26 @@ async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> Reque
         return obj
 
 
+async def create_guests(session: AsyncSession, data: RequestsCreate, request_id: UUID):
+    for i in range(len(data.full_name)):
+        statement = Guests(
+            id=uuid4(),
+            request_id=request_id,
+            full_name=data.full_name[i],
+            email=data.email[i],
+            phone_number=data.phone_number[i],
+            is_foreign=data.is_foreign[i],
+            visit_status=VisitStatusEnum.PENDING.value
+        )
+        session.add(statement)
+
+
 class RequestsController(Controller):
 
     @get(path="/requests")
     async def get_list_requests(
             self,
-            db_session: AsyncSession,
+            session: AsyncSession,
             request: 'Request[Users, Token, Any]',
             limit_offset: LimitOffset,
             status: Optional[StatusEnum] = None,
@@ -80,12 +100,12 @@ class RequestsController(Controller):
             appellant: Optional[str] = None
     ) -> OffsetPagination[Requests]:
         total_query = select(func.count(RequestsDto.id))
-        total = await db_session.execute(total_query)
+        total = await session.execute(total_query)
         total_count = total.scalar_one()
 
-        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(db_session, request.user.id):
+        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(session, request.user.id):
             requests = await list_requests(
-                db_session,
+                session,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -94,7 +114,7 @@ class RequestsController(Controller):
             )
         else:
             requests = await list_requests(
-                db_session,
+                session,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -113,10 +133,10 @@ class RequestsController(Controller):
     @get(path="/requests/{request_id:uuid}")
     async def get_request_id(
             self,
-            db_session: AsyncSession,
+            session: AsyncSession,
             request_id: UUID,
     ) -> Requests:
-        request = await get_request_by_id(db_session, request_id)
+        request = await get_request_by_id(session, request_id)
         return Requests.from_orm(request)
 
     @post(path="/requests/create")
@@ -129,8 +149,6 @@ class RequestsController(Controller):
     ) -> Any:
         statement = RequestsDto(
             id=uuid4(),
-            full_name=data.full_name,
-            email_address=data.email_address,
             visit_purpose=data.visit_purpose,
             place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
@@ -139,6 +157,9 @@ class RequestsController(Controller):
             confirming_id=None,
         )
         transaction.add(statement)
+
+        await create_guests(transaction, data, statement.id)
+
         # applicant_channel = f"applicant_{statement.appellant_id}"
         # await channels.subscribe(applicant_channel)
         #
@@ -205,7 +226,9 @@ class RequestsController(Controller):
                 </body>
             </html>
             '''
-            await send_message(result.email_address, html_message)
+
+            for guest in result.guest:
+                await send_message(guest.email, html_message)
 
             html_message = f'''
             <html>

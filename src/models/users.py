@@ -8,7 +8,7 @@ from sqlalchemy.sql.sqltypes import (
 )
 
 from src.models import Base
-from src.models.guests import RequestsDto
+from src.models.requests import RequestsDto
 
 
 class Tokens(Base):

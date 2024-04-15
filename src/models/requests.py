@@ -12,8 +12,6 @@ from src.models import Base
 class RequestsDto(Base):
     __tablename__ = "requests"
     id: Mapped[UUID] = mapped_column(default=uuid4, primary_key=True)
-    full_name: Mapped[str]
-    email_address: Mapped[str]
     visit_purpose: Mapped[str]
     place_of_visit: Mapped[str]
     datetime_of_visit: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -25,3 +23,17 @@ class RequestsDto(Base):
     appellant = relationship("Users", back_populates="requests_appellant", foreign_keys=[appellant_id], lazy='selectin')
     confirming = relationship("Users", back_populates="requests_confirming", foreign_keys=[confirming_id],
                               lazy='selectin')
+    guest = relationship('Guests', back_populates="request", lazy='selectin')
+
+
+class Guests(Base):
+    __tablename__ = "guests"
+    id: Mapped[UUID] = mapped_column(default=uuid4, primary_key=True)
+    request_id: Mapped[UUID] = mapped_column(ForeignKey('requests.id'))
+    full_name: Mapped[str]
+    email: Mapped[str]
+    phone_number: Mapped[str]
+    is_foreign: Mapped[bool]
+    visit_status: Mapped[int]
+
+    request = relationship("RequestsDto", back_populates="guest", foreign_keys=[request_id])
