@@ -212,19 +212,27 @@ class RequestsController(Controller):
 
             message = f'''{result.appellant.full_name} назначил вам встречу.\nМесто встречи: {result.place_of_visit}.\nВремя встречи: {result.datetime_of_visit.date()} {result.datetime_of_visit.hour}:{result.datetime_of_visit.minute}.\nПредъявите данный qr-код охране при входе.'''
             message = message.split('\n')
-            src = "{str(request.url.scheme)}://{str(request.url.netloc)}/static/{path[3:]}"
+            src = f"{str(request.url.scheme)}://{str(request.url.netloc)}/static/{path[3:]}"
             html_message = f'''
-            <html>
-                <body>
-                    <p>{message[0]}</p>
-                    <p>{message[1]}</p>
-                    <p>{message[2]}</p>
-                    <p>{message[3]}</p>
-                    <div><img alt="Image" src={src}/></div>
+                <html lang="ru">
+                <head>
+                    <meta charset="utf-8">
+                    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+                    <meta content="width=device-width,initial-scale=1.0" name="viewport">
+                    <link href="<%= BASE_URL %>favicon.ico" rel="icon">
+                    <title><%= htmlWebpackPlugin.options.title %></title>
+                </head>
+                <body style="background-color: blue; font-family: 'Inter', sans-serif; justify-content: center; display: flex; padding-top: 50px; padding-bottom: 50px">
+                <div style="text-align:center;background-color:white;width:700px;border-radius:11px;margin:auto;padding-bottom: 22px;padding-top: 22px;">
+                    <h1>{result.appellant.full_name} назначил вам встречу</h1>
+                    <h2>Место встречи: {result.place_of_visit}</h2>
+                    <h2>Время встречи: {result.datetime_of_visit.date()} {result.datetime_of_visit.hour}:{result.datetime_of_visit.minute}</h2>
+                    <h2>Предъявите QR-код при входе</h2>
+                    <img alt="hh" src={src}>
+                </div>
                 </body>
-            </html>
             '''
-
+            print(html_message)
             for guest in result.guest:
                 await send_message(guest.email, html_message)
 
