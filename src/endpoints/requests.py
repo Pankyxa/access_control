@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.endpoints.roles import RolesEnum, get_roles
-from src.models.guests import RequestsDto
+from src.models.requests import RequestsDto, Guests
 from src.models.users import Users
 from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete
 from src.utils import send_message
@@ -26,6 +26,12 @@ class StatusEnum(Enum):
     NEW = 1
     ACCEPTED = 2
     REJECTED = 3
+
+
+class VisitStatusEnum(Enum):
+    PENDING = 1
+    ENTERED = 2
+    EXITED = 3
 
 
 async def list_requests(
@@ -38,27 +44,28 @@ async def list_requests(
 ) -> List[RequestsDto]:
     async with (db_session as session):
         query = select(RequestsDto).options(
-            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming), selectinload(RequestsDto.guest)
         ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
 
         if status:
             query = query.where(RequestsDto.status == status.value).distinct()
 
         if fullname:
-            query = query.where(RequestsDto.full_name.like(f'%{fullname}%')).distinct()
+            query = query.join(Guests, RequestsDto.guest).where(Guests.full_name.like(f'%{fullname}%')).distinct()
 
         if appellant:
-            query = select(RequestsDto).join(Users, RequestsDto.appellant).where(Users.full_name
-                                                                                 .like(f'%{appellant}%'))
+            query = query.join(Users, RequestsDto.appellant).where(Users.full_name
+                                                                   .like(f'%{appellant}%')).distinct()
 
         result = await session.execute(query)
         return [it for it in result.scalars()]
 
 
-async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> RequestsDto:
-    async with db_session as session:
+async def get_request_by_id(session: AsyncSession, request_id: UUID) -> RequestsDto:
+    async with session as session:
         statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
-            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming)
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming),
+            selectinload(RequestsDto.guest)
         )
         result = await session.execute(statement)
         obj = result.scalar_one_or_none()
@@ -67,22 +74,35 @@ async def get_request_by_id(db_session: AsyncSession, request_id: UUID) -> Reque
         return obj
 
 
+async def create_guests(session: AsyncSession, data: RequestsCreate, request_id: UUID):
+    for i in range(len(data.full_name)):
+        statement = Guests(
+            id=uuid4(),
+            request_id=request_id,
+            full_name=data.full_name[i],
+            email=data.email[i],
+            phone_number=data.phone_number[i],
+            is_foreign=data.is_foreign[i],
+            visit_status=VisitStatusEnum.PENDING.value
+        )
+        session.add(statement)
+
+
 class RequestsController(Controller):
 
     @get(path="/requests")
     async def get_list_requests(
             self,
-            db_session: AsyncSession,
+            transaction: AsyncSession,
             request: 'Request[Users, Token, Any]',
             limit_offset: LimitOffset,
             status: Optional[StatusEnum] = None,
             fullname: Optional[str] = None,
             appellant: Optional[str] = None
     ) -> OffsetPagination[Requests]:
-
-        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(db_session, request.user.id):
+        if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(transaction, request.user.id):
             requests = await list_requests(
-                db_session,
+                transaction,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -91,7 +111,7 @@ class RequestsController(Controller):
             )
         else:
             requests = await list_requests(
-                db_session,
+                transaction,
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
@@ -101,7 +121,6 @@ class RequestsController(Controller):
 
         pydantic_requests = [Requests.from_orm(req) for req in requests]
         total = len(pydantic_requests)
-
         return OffsetPagination[Requests](
             items=pydantic_requests,
             total=total,
@@ -112,10 +131,10 @@ class RequestsController(Controller):
     @get(path="/requests/{request_id:uuid}")
     async def get_request_id(
             self,
-            db_session: AsyncSession,
+            transaction: AsyncSession,
             request_id: UUID,
     ) -> Requests:
-        request = await get_request_by_id(db_session, request_id)
+        request = await get_request_by_id(transaction, request_id)
         return Requests.from_orm(request)
 
     @post(path="/requests/create")
@@ -128,8 +147,6 @@ class RequestsController(Controller):
     ) -> Any:
         statement = RequestsDto(
             id=uuid4(),
-            full_name=data.full_name,
-            email_address=data.email_address,
             visit_purpose=data.visit_purpose,
             place_of_visit=data.place_of_visit,
             datetime_of_visit=data.datetime_of_visit,
@@ -138,6 +155,9 @@ class RequestsController(Controller):
             confirming_id=None,
         )
         transaction.add(statement)
+
+        await create_guests(transaction, data, statement.id)
+
         # applicant_channel = f"applicant_{statement.appellant_id}"
         # await channels.subscribe(applicant_channel)
         #
@@ -204,7 +224,9 @@ class RequestsController(Controller):
                 </body>
             </html>
             '''
-            await send_message(result.email_address, html_message)
+
+            for guest in result.guest:
+                await send_message(guest.email, html_message)
 
             html_message = f'''
             <html>

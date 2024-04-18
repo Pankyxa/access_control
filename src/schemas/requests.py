@@ -6,12 +6,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from pydantic import EmailStr
+from pydantic_extra_types.phone_numbers import PhoneNumber
 
 
 class Requests(BaseModel):
     id: UUID
-    full_name: str
-    email_address: EmailStr
+    guest: list[GuestSerialize]
     appellant_id: UUID
     appellant: UserSerialize
     datetime: datetime
@@ -45,9 +45,24 @@ class UserSerialize(BaseModel):
         from_attributes = True
 
 
-class RequestsCreate(BaseModel):
+class GuestSerialize(BaseModel):
+    id: UUID
     full_name: str
-    email_address: EmailStr
+    email: EmailStr
+    phone_number: PhoneNumber
+    is_foreign: bool
+    visit_status: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
+class RequestsCreate(BaseModel):
+    full_name: list[str]
+    email: list[EmailStr]
+    phone_number: list[PhoneNumber]
+    is_foreign: list[bool]
     visit_purpose: str
     place_of_visit: str
     datetime_of_visit: datetime
