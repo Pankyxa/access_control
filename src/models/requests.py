@@ -24,7 +24,7 @@ class RequestsDto(Base):
                              lazy='selectin')
     confirming = relationship("Users", back_populates="requests_confirming", foreign_keys=[confirming_id],
                               lazy='selectin')
-    guest = relationship('Guests', back_populates="request", lazy='selectin')
+    guest = relationship('Guests', back_populates="request", lazy='joined')
 
 
 class Guests(Base):

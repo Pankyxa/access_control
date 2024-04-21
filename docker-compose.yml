@@ -11,6 +11,7 @@ services:
       - "80:80"
     volumes:
       - .:/app
+      - /home/wifelly/projects/ass_c/qr/:/app/qr
     environment:
       - LITESTAR_AUTO_RELOAD=true
 
