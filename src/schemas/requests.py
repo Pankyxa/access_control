@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import IntEnum
 from typing import Optional, List
 from uuid import UUID
 
@@ -9,13 +10,22 @@ from pydantic import EmailStr
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 
+class StatusEnum(IntEnum):
+    Ожидает = 1
+    Одобрена = 2
+    Отклонена = 3
+
+
 class Requests(BaseModel):
     id: UUID
-    guest: list[GuestSerialize]
+    visit_purpose: str
+    place_of_visit: str
+    datetime_of_visit: datetime
+    guests: list[GuestSerialize]
     appellant_id: UUID
     appellant: UserSerialize
     datetime: datetime
-    status: int
+    status: StatusEnum
     confirming_id: Optional[UUID]
     confirming: Optional[UserSerialize]
 
@@ -59,18 +69,26 @@ class GuestSerialize(BaseModel):
 
 
 class RequestsCreate(BaseModel):
-    full_name: list[str]
-    email: list[EmailStr]
-    phone_number: list[PhoneNumber]
-    is_foreign: list[bool]
+    guests: list[GuestsCreate]
     visit_purpose: str
     place_of_visit: str
     datetime_of_visit: datetime
 
 
+class GuestsCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone_number: PhoneNumber
+    is_foreign: bool
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+
 class RequestsReview(BaseModel):
     request_id: UUID
-    status: int
+    status: StatusEnum
 
 
 class RequestsDelete(BaseModel):

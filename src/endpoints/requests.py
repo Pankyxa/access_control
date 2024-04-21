@@ -44,14 +44,14 @@ async def list_requests(
 ) -> List[RequestsDto]:
     async with (db_session as session):
         query = select(RequestsDto).options(
-            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming), selectinload(RequestsDto.guest)
+            selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming), selectinload(RequestsDto.guests)
         ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
 
         if status:
             query = query.where(RequestsDto.status == status.value).distinct()
 
         if fullname:
-            query = query.join(Guests, RequestsDto.guest).where(Guests.full_name.like(f'%{fullname}%')).distinct()
+            query = query.join(Guests, RequestsDto.guests).where(Guests.full_name.like(f'%{fullname}%')).distinct()
 
         if appellant:
             query = query.join(Users, RequestsDto.appellant).where(Users.full_name
@@ -65,7 +65,7 @@ async def get_request_by_id(session: AsyncSession, request_id: UUID) -> Requests
     async with session as session:
         statement = select(RequestsDto).filter(RequestsDto.id == request_id).options(
             selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming),
-            selectinload(RequestsDto.guest)
+            selectinload(RequestsDto.guests)
         )
         result = await session.execute(statement)
         obj = result.scalar_one_or_none()
@@ -75,14 +75,14 @@ async def get_request_by_id(session: AsyncSession, request_id: UUID) -> Requests
 
 
 async def create_guests(session: AsyncSession, data: RequestsCreate, request_id: UUID):
-    for i in range(len(data.full_name)):
+    for i in data.guests:
         statement = Guests(
             id=uuid4(),
             request_id=request_id,
-            full_name=data.full_name[i],
-            email=data.email[i],
-            phone_number=data.phone_number[i],
-            is_foreign=data.is_foreign[i],
+            full_name=i.full_name,
+            email=i.email,
+            phone_number=i.phone_number,
+            is_foreign=i.is_foreign,
             visit_status=VisitStatusEnum.PENDING.value
         )
         session.add(statement)
@@ -97,7 +97,7 @@ class RequestsController(Controller):
             request: 'Request[Users, Token, Any]',
             limit_offset: LimitOffset,
             status: Optional[StatusEnum] = None,
-            fullname: Optional[str] = None,
+            full_name: Optional[str] = None,
             appellant: Optional[str] = None
     ) -> OffsetPagination[Requests]:
         if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(transaction, request.user.id):
@@ -106,7 +106,7 @@ class RequestsController(Controller):
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
-                fullname=fullname,
+                fullname=full_name,
                 appellant=request.user.full_name
             )
         else:
@@ -115,7 +115,7 @@ class RequestsController(Controller):
                 limit_offset.limit,
                 limit_offset.offset,
                 status=status,
-                fullname=fullname,
+                fullname=full_name,
                 appellant=appellant
             )
 
@@ -233,7 +233,7 @@ class RequestsController(Controller):
                 </body>
             '''
             print(html_message)
-            for guest in result.guest:
+            for guest in result.guests:
                 await send_message(guest.email, html_message)
 
             html_message = f'''
