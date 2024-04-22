@@ -24,7 +24,8 @@ class RequestsDto(Base):
                              lazy='selectin')
     confirming = relationship("Users", back_populates="requests_confirming", foreign_keys=[confirming_id],
                               lazy='selectin')
-    guest = relationship('Guests', back_populates="request", lazy='joined')
+
+    guests = relationship('Guests', back_populates="request", lazy='selectin')
 
 
 class Guests(Base):
@@ -37,4 +38,4 @@ class Guests(Base):
     is_foreign: Mapped[bool]
     visit_status: Mapped[int]
 
-    request = relationship("RequestsDto", back_populates="guest", foreign_keys=[request_id])
+    request = relationship("RequestsDto", back_populates="guests", foreign_keys=[request_id])
