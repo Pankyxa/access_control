@@ -14,7 +14,7 @@ from src.dependencies import provide_transaction, limitoffsetpagination
 from src.endpoints.auth import register_handler, login_handler
 from src.endpoints.requests import RequestsController
 from src.endpoints.roles import assign_role_handler, remove_role_handler
-from src.endpoints.users import create_user_handler, get_list_users, get_user_id, get_user_self
+from src.endpoints.users import new_password_handler, recovery_password_handler, create_user_handler, get_list_users, get_user_id, get_user_self
 
 
 async def start() -> None:
@@ -31,7 +31,7 @@ cors_config = CORSConfig(
 
 app = Litestar(
     [register_handler, login_handler, assign_role_handler, remove_role_handler, RequestsController,
-     create_user_handler, get_list_users, get_user_id,
+     create_user_handler, get_list_users, get_user_id, recovery_password_handler, new_password_handler,
      create_static_files_router(path='/static', directories=['qr'], send_as_attachment=True), get_user_self],
     on_app_init=[jwt_auth.on_app_init],
     on_startup=[start],
