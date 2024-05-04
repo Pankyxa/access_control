@@ -131,3 +131,12 @@ async def get_user_id(
 ) -> UserSerialize:
     request = await get_user_by_id(transaction, user_id)
     return UserSerialize.from_orm(request)
+
+
+@get(path="/users/me")
+async def get_user_self(
+        request: 'Request[Users, Token, Any]',
+        transaction: AsyncSession,
+) -> UserSerialize:
+    request_orm = await get_user_by_id(transaction, request.user.id)
+    return UserSerialize.from_orm(request_orm)

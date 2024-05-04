@@ -61,7 +61,10 @@ async def login_handler(data: UserLogin, transaction: AsyncSession) -> Response[
     user = await get_user_by_email(data.email, transaction)
     try:
         if decrypt(user.password) == data.password:
-            return jwt_auth.login(identifier=str(data.email), send_token_as_response_body=True)
+            return jwt_auth.login(identifier=str(user.email),
+                                  token_extras={"full_name": user.full_name, "id": str(user.id),
+                                                "roles": [int(role.id) for role in user.roles]},
+                                  send_token_as_response_body=True)
         else:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
     except NoResultFound:

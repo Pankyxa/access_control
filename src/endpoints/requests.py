@@ -11,7 +11,7 @@ from litestar.exceptions import HTTPException
 from litestar.pagination import OffsetPagination
 from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -26,6 +26,7 @@ class StatusEnum(Enum):
     NEW = 1
     ACCEPTED = 2
     REJECTED = 3
+    DELETED = 4
 
 
 class VisitStatusEnum(Enum):
@@ -176,10 +177,10 @@ class RequestsController(Controller):
         obj = await transaction.execute(statement)
         obj = obj.scalar_one()
 
-        if not obj.appellant_id == request.user.id or RolesEnum.admin.value not in request.user.roles:
+        if not obj.appellant_id == request.user.id or RolesEnum.admin.value not in [role.id for role in
+                                                                                    request.user.roles]:
             raise HTTPException(status_code=403, detail="Forbidden")
-        rem = delete(RequestsDto).where(RequestsDto.id == data.request_id)
-        await transaction.execute(rem)
+        obj.status = StatusEnum.DELETED.value
         return Response(status_code=200, content={"message": "Request removed"})
 
     @post(path="/requests/review")
