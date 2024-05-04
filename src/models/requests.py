@@ -20,9 +20,11 @@ class RequestsDto(Base):
     status: Mapped[int]
     confirming_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id'), default=None)
 
-    appellant = relationship("Users", back_populates="requests_appellant", foreign_keys=[appellant_id], lazy='selectin')
+    appellant = relationship("Users", back_populates="requests_appellant", foreign_keys=[appellant_id],
+                             lazy='selectin')
     confirming = relationship("Users", back_populates="requests_confirming", foreign_keys=[confirming_id],
                               lazy='selectin')
+
     guests = relationship('Guests', back_populates="request", lazy='selectin')
 
 

@@ -1,6 +1,6 @@
 import os
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 from uuid import UUID, uuid4
 
 import qrcode
@@ -8,8 +8,6 @@ from litestar import get, post, Request, Response
 from litestar.channels import ChannelsPlugin
 from litestar.controller import Controller
 from litestar.exceptions import HTTPException
-from litestar.pagination import OffsetPagination
-from litestar.repository.filters import LimitOffset
 from litestar.security.jwt import Token
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,16 +34,17 @@ class VisitStatusEnum(Enum):
 
 async def list_requests(
         db_session: AsyncSession,
-        limit: int = 10,
-        offset: int = 0,
+        request: 'Request[Users, Token, Any]',
         status: Optional[StatusEnum] = None,
         fullname: Optional[str] = None,
         appellant: Optional[str] = None
 ) -> List[RequestsDto]:
     async with (db_session as session):
         query = select(RequestsDto).options(
+            selectinload(RequestsDto.appellant),
+            selectinload(RequestsDto.confirming),
             selectinload(RequestsDto.appellant), selectinload(RequestsDto.confirming), selectinload(RequestsDto.guests)
-        ).order_by(RequestsDto.datetime.desc()).offset(offset).limit(limit)
+        ).order_by(RequestsDto.datetime.desc())
 
         if status:
             query = query.where(RequestsDto.status == status.value).distinct()
@@ -95,16 +94,14 @@ class RequestsController(Controller):
             self,
             transaction: AsyncSession,
             request: 'Request[Users, Token, Any]',
-            limit_offset: LimitOffset,
             status: Optional[StatusEnum] = None,
             full_name: Optional[str] = None,
             appellant: Optional[str] = None
-    ) -> OffsetPagination[Requests]:
+    ) -> List[Requests]:
         if len(request.user.roles) == 1 and RolesEnum.employee.value in await get_roles(transaction, request.user.id):
             requests = await list_requests(
                 transaction,
-                limit_offset.limit,
-                limit_offset.offset,
+                request,
                 status=status,
                 fullname=full_name,
                 appellant=request.user.full_name
@@ -112,21 +109,13 @@ class RequestsController(Controller):
         else:
             requests = await list_requests(
                 transaction,
-                limit_offset.limit,
-                limit_offset.offset,
+                request,
                 status=status,
                 fullname=full_name,
                 appellant=appellant
             )
 
-        pydantic_requests = [Requests.from_orm(req) for req in requests]
-        total = len(pydantic_requests)
-        return OffsetPagination[Requests](
-            items=pydantic_requests,
-            total=total,
-            limit=limit_offset.limit,
-            offset=limit_offset.offset,
-        )
+        return [Requests.from_orm(req) for req in requests]
 
     @get(path="/requests/{request_id:uuid}")
     async def get_request_id(
@@ -172,14 +161,17 @@ class RequestsController(Controller):
             transaction: AsyncSession,
             data: RequestsDelete,
     ) -> Response:
+        if RolesEnum.admin.value not in await get_roles(transaction, request.user.id):
+            raise HTTPException(status_code=403, detail="Forbidden")
+
         statement = select(RequestsDto).where(RequestsDto.id == data.request_id)
         obj = await transaction.execute(statement)
-        obj = obj.scalar_one()
+        obj = obj.scalar_one_or_none()
 
-        if not obj.appellant_id == request.user.id or RolesEnum.admin.value not in request.user.roles:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        rem = delete(RequestsDto).where(RequestsDto.id == data.request_id)
-        await transaction.execute(rem)
+        if obj is None:
+            raise HTTPException(status_code=404, detail="Request not found")
+
+        await transaction.delete(obj)
         return Response(status_code=200, content={"message": "Request removed"})
 
     @post(path="/requests/review")
