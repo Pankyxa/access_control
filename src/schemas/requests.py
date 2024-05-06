@@ -14,6 +14,7 @@ class StatusEnum(IntEnum):
     Ожидает = 1
     Одобрена = 2
     Отклонена = 3
+    Удалена = 4
 
 
 class Requests(BaseModel):

@@ -6,16 +6,14 @@ from litestar.contrib.sqlalchemy.base import UUIDBase
 from litestar.contrib.sqlalchemy.plugins import SQLAlchemyPlugin
 from litestar.di import Provide
 from litestar.static_files import create_static_files_router
-
 from src.auth import jwt_auth
 # from src.channels.notifications import notifications_handler
 from src.db import db_config
 from src.dependencies import provide_transaction, limitoffsetpagination
-from src.endpoints.auth import register_handler, login_handler
+from src.endpoints.auth import register_handler, login_handler, new_password_handler, recovery_password_handler
 from src.endpoints.requests import RequestsController
 from src.endpoints.roles import assign_role_handler, remove_role_handler
-from src.endpoints.users import (create_user_handler, get_list_users, get_user_id, new_password_handler,
-                                 recovery_password_handler)
+from src.endpoints.users import (create_user_handler, get_list_users, get_user_id)
 
 
 async def start() -> None:
@@ -23,7 +21,12 @@ async def start() -> None:
         await conn.run_sync(UUIDBase.metadata.create_all)
 
 
-cors_config = CORSConfig(allow_origins=['*'])
+cors_config = CORSConfig(
+    allow_origins=["*"],  # Разрешает запросы от всех источников
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Разрешает все эти методы
+    allow_headers=["Content-Type", "Authorization"],  # Разрешает заголовки Content-Type и Authorization
+    allow_credentials=True  # Разрешает передачу cookies и credentials
+)
 
 app = Litestar(
     [register_handler, login_handler, assign_role_handler, remove_role_handler, RequestsController,

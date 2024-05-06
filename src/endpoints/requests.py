@@ -24,6 +24,7 @@ class StatusEnum(Enum):
     NEW = 1
     ACCEPTED = 2
     REJECTED = 3
+    DELETED = 4
 
 
 class VisitStatusEnum(Enum):
@@ -171,6 +172,10 @@ class RequestsController(Controller):
         if obj is None:
             raise HTTPException(status_code=404, detail="Request not found")
 
+        if not obj.appellant_id == request.user.id or RolesEnum.admin.value not in [role.id for role in
+                                                                                    request.user.roles]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        obj.status = StatusEnum.DELETED.value
         await transaction.delete(obj)
         return Response(status_code=200, content={"message": "Request removed"})
 
