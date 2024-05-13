@@ -1,4 +1,5 @@
 import base64
+from datetime import timedelta
 from typing import Any
 
 from cryptography.fernet import Fernet
@@ -42,4 +43,5 @@ jwt_auth = JWTAuth[Users](
     retrieve_user_handler=retrieve_user_handler,
     token_secret=settings.jwt_secret,
     exclude=["/register/*", "/login", "/schema", "/static/*"],
+    default_token_expiration=timedelta(hours=12),
 )

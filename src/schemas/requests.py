@@ -15,6 +15,13 @@ class StatusEnum(IntEnum):
     Одобрена = 2
     Отклонена = 3
     Удалена = 4
+    Завершена = 5
+
+
+class GuestsStatusEnum(IntEnum):
+    Еще_не_явился = 1
+    В_здании = 2
+    Вышел = 3
 
 
 class Requests(BaseModel):
@@ -94,3 +101,8 @@ class RequestsReview(BaseModel):
 
 class RequestsDelete(BaseModel):
     request_id: UUID
+
+
+class GuestsReview(BaseModel):
+    guest_id: UUID
+    status: GuestsStatusEnum

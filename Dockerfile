@@ -11,7 +11,7 @@ COPY . /app
 RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
 # Expose the port the app runs on
-EXPOSE 80
+EXPOSE 3000
 
 # Run the app with the Litestar CLI
-CMD ["litestar", "run", "--host", "0.0.0.0", "--port", "80", "-d", "-r"]
+CMD ["litestar", "run", "--host", "0.0.0.0", "--port", "3000", "-d", "-r"]

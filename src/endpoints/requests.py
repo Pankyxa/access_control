@@ -1,6 +1,6 @@
 import os
 from enum import Enum
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 from uuid import UUID, uuid4
 
 import qrcode
@@ -9,14 +9,14 @@ from litestar.channels import ChannelsPlugin
 from litestar.controller import Controller
 from litestar.exceptions import HTTPException
 from litestar.security.jwt import Token
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.requests import RequestsDto, Guests
 from src.models.users import Users
-from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete
+from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete, GuestsReview
 from src.utils import send_message
 
 
@@ -25,6 +25,7 @@ class StatusEnum(Enum):
     ACCEPTED = 2
     REJECTED = 3
     DELETED = 4
+    COMPLETED = 5
 
 
 class VisitStatusEnum(Enum):
@@ -176,8 +177,6 @@ class RequestsController(Controller):
                                                                                     request.user.roles]:
             raise HTTPException(status_code=403, detail="Forbidden")
         obj.status = StatusEnum.DELETED.value
-
-        await transaction.delete(obj)
         return Response(status_code=200, content={"message": "Request removed"})
 
     @post(path="/requests/review")
@@ -255,3 +254,33 @@ class RequestsController(Controller):
         # channels.publish({'message': 'Your request has been reviewed'}, 'applicant')
         return Response(status_code=202,
                         content={"message": "Request reviewed successfully", "appellant_id": result.appellant_id})
+
+    @post(path='/requests/guests/actions')
+    async def request_guests_actions(
+            self,
+            request: Request[Users, Token, Any],
+            transaction: AsyncSession,
+            data: GuestsReview,
+    ) -> Response:
+        if RolesEnum.security.value not in await get_roles(transaction, request.user.id):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        statement = select(Guests).where(Guests.id == data.guest_id)
+        result = await transaction.execute(statement)
+        result = result.scalar_one_or_none()
+        if result is None:
+            raise HTTPException(status_code=404, detail="Guest not found")
+        result.visit_status = data.status
+
+        request_id = result.request_id
+        statement = select(Guests).where(Guests.request_id == request_id)
+        result = await transaction.execute(statement)
+        result = result.scalars().all()
+
+        if all(guest.visit_status == VisitStatusEnum.EXITED.value for guest in result):
+            statement = select(RequestsDto).where(RequestsDto.id == request_id)
+            result = await transaction.execute(statement)
+            result = result.scalar_one_or_none()
+            if result is None:
+                raise HTTPException(status_code=404, detail="Request not found")
+            result.status = StatusEnum.COMPLETED.value
+        return Response(status_code=202, content={'message': 'Guest reviewed successfully'})
