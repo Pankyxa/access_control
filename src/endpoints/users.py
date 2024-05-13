@@ -61,7 +61,7 @@ async def create_user_handler(
     )
     transaction.add(tokens)
 
-    url = str(request.url.scheme) + '://' + str(request.url.netloc) + '/register/' + str(token)
+    url = 'http://89.204.58.149/register/' + str(token)
 
     message = f'Вы были зарегестрированы в системе "Допуск на ТИУ третьих лиц". Перейдите по ссылке чтобы завершить регистрацию: {url}'
     html_message = f'''

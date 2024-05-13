@@ -47,7 +47,11 @@ async def register_handler(data: UserRegister, transaction: AsyncSession, token:
     existing_user.password = encrypt(data.password)
 
     existing_token.status = StatusEnum.registered.value
-    return jwt_auth.login(identifier=str(existing_user.email), send_token_as_response_body=True)
+    return jwt_auth.login(identifier=str(existing_user.email),
+                          token_extras={"full_name": existing_user.full_name, "id": str(existing_user.id),
+                                        "roles": [int(role.id) for role in existing_user.roles],
+                                        "email": existing_user.email},
+                          send_token_as_response_body=True)
 
 
 async def get_user_by_email(email: str, session: AsyncSession) -> Users:
@@ -66,7 +70,7 @@ async def login_handler(data: UserLogin, transaction: AsyncSession) -> Response[
         if decrypt(user.password) == data.password:
             return jwt_auth.login(identifier=str(user.email),
                                   token_extras={"full_name": user.full_name, "id": str(user.id),
-                                                "roles": [int(role.id) for role in user.roles]},
+                                                "roles": [int(role.id) for role in user.roles], "email": user.email},
                                   send_token_as_response_body=True)
         else:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
