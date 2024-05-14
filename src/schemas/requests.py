@@ -97,6 +97,7 @@ class GuestsCreate(BaseModel):
 class RequestsReview(BaseModel):
     request_id: UUID
     status: StatusEnum
+    comment: Optional[str]
 
 
 class RequestsDelete(BaseModel):

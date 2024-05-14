@@ -177,6 +177,7 @@ class RequestsController(Controller):
                                                                                     request.user.roles]:
             raise HTTPException(status_code=403, detail="Forbidden")
         obj.status = StatusEnum.DELETED.value
+        await transaction.delete(obj)
         return Response(status_code=200, content={"message": "Request removed"})
 
     @post(path="/requests/review")
