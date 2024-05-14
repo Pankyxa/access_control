@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.requests import RequestsDto, Guests
 from src.models.users import Users
-from src.schemas.requests import RequestsCreate, RequestsReview, Requests, GuestsReview
+from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete, GuestsReview
 from src.utils import send_message
 
 

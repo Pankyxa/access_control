@@ -19,6 +19,7 @@ class RequestsDto(Base):
     datetime: Mapped[datetime] = mapped_column(default=datetime.now)
     status: Mapped[int]
     confirming_id: Mapped[UUID | None] = mapped_column(ForeignKey('users.id'), default=None)
+    comment: Mapped[str | None]
 
     appellant = relationship("Users", back_populates="requests_appellant", foreign_keys=[appellant_id],
                              lazy='selectin')
