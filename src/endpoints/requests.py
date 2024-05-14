@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from src.endpoints.roles import RolesEnum, get_roles
 from src.models.requests import RequestsDto, Guests
 from src.models.users import Users
-from src.schemas.requests import RequestsCreate, RequestsReview, Requests, RequestsDelete, GuestsReview
+from src.schemas.requests import RequestsCreate, RequestsReview, Requests, GuestsReview
 from src.utils import send_message
 
 
@@ -155,29 +155,6 @@ class RequestsController(Controller):
         # channels.publish({'message': 'New request created, waiting for confirmation'}, 'sec')
         return Response(status_code=202,
                         content={"message": "Request sent to review", "appellant_id": statement.appellant_id})
-
-    @post(path="/requests/remove")
-    async def remove_request(
-            self,
-            request: Request[Users, Token, Any],
-            transaction: AsyncSession,
-            data: RequestsDelete,
-    ) -> Response:
-        if RolesEnum.admin.value not in await get_roles(transaction, request.user.id):
-            raise HTTPException(status_code=403, detail="Forbidden")
-
-        statement = select(RequestsDto).where(RequestsDto.id == data.request_id)
-        obj = await transaction.execute(statement)
-        obj = obj.scalar_one_or_none()
-
-        if obj is None:
-            raise HTTPException(status_code=404, detail="Request not found")
-
-        if not obj.appellant_id == request.user.id or RolesEnum.admin.value not in [role.id for role in
-                                                                                    request.user.roles]:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        obj.status = StatusEnum.DELETED.value
-        return Response(status_code=200, content={"message": "Request removed"})
 
     @post(path="/requests/review")
     async def request_review(
